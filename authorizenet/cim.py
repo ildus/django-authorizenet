@@ -80,6 +80,41 @@ def update_payment_profile(profile_id, payment_profile_id, payment_form_data, bi
     return response
 
 
+def create_payment_profile(profile_id, payment_form_data, billing_form_data):
+    """
+    Create a customer payment profile and return a tuple of the CIMResponse and
+    payment profile ID.
+
+    Arguments:
+    profile_id -- unique gateway-assigned profile identifier
+    payment_form_data -- dictionary with keys in CREDIT_CARD_FIELDS
+    billing_form_data -- dictionary with keys in BILLING_FIELDS
+    """
+    payment_data = extract_form_data(payment_form_data)
+    billing_data = extract_form_data(billing_form_data)
+    payment_data['expirationDate'] = payment_data['expirationDate'].strftime('%Y-%m')
+    helper = CreatePaymentProfileRequest(profile_id, billing_data, payment_data)
+    response = helper.get_response()
+    if response.success:
+        payment_profile_id = helper.payment_profile_id
+    else:
+        payment_profile_id = None
+    return response, payment_profile_id
+
+
+def delete_payment_profile(profile_id, payment_profile_id):
+    """
+    Delete a customer payment profile and return the CIMResponse.
+
+    Arguments:
+    profile_id -- unique gateway-assigned profile identifier
+    payment_profile_id -- unique gateway-assigned payment profile identifier
+    """
+    helper = DeletePaymentProfileRequest(profile_id, payment_profile_id)
+    response = helper.get_response()
+    return response
+
+
 def get_profile(profile_id):
     """
     Retrieve a customer payment profile from the profile ID and return a tuple
@@ -251,6 +286,31 @@ class UpdatePaymentProfileRequest(BasePaymentProfileRequest):
         self.root.appendChild(payment_profile)
 
 
+class CreatePaymentProfileRequest(BasePaymentProfileRequest):
+    def __init__(self, profile_id, billing_data=None, credit_card_data=None):
+        super(CreatePaymentProfileRequest, self).__init__("createCustomerPaymentProfileRequest")
+        profile_id_node = self.get_text_node("customerProfileId", profile_id)
+        payment_profile = self.get_payment_profile_node(billing_data, credit_card_data, "paymentProfile")
+        self.root.appendChild(profile_id_node)
+        self.root.appendChild(payment_profile)
+
+    def process_response(self, response):
+        for e in response.childNodes[0].childNodes:
+            if e.localName == 'messages':
+                self.process_message_node(e)
+            elif e.localName == 'customerPaymentProfileId':
+                self.payment_profile_id = e.childNodes[0].nodeValue
+
+
+class DeletePaymentProfileRequest(BasePaymentProfileRequest):
+    def __init__(self, profile_id, payment_profile_id):
+        super(DeletePaymentProfileRequest, self).__init__("deleteCustomerPaymentProfileRequest")
+        profile_id_node = self.get_text_node("customerProfileId", profile_id)
+        payment_profile_id_node = self.get_text_node("customerPaymentProfileId", payment_profile_id)
+        self.root.appendChild(profile_id_node)
+        self.root.appendChild(payment_profile_id_node)
+
+
 class GetProfileRequest(BaseRequest):
     def __init__(self, profile_id):
         super(GetProfileRequest, self).__init__("getCustomerProfileRequest")
@@ -277,6 +337,8 @@ class GetProfileRequest(BaseRequest):
                 data['billing'] = self.extract_billing_data(e)
             if e.localName == 'payment':
                 data['credit_card'] = self.extract_credit_card_data(e.childNodes[0])
+            if e.localName == 'customerPaymentProfileId':
+                data['payment_profile_id'] = e.childNodes[0].nodeValue
         return data
 
     def process_response(self, response):
