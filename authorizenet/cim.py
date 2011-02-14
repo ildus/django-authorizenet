@@ -321,7 +321,10 @@ class GetProfileRequest(BaseRequest):
         child_dict = {}
         for e in node.childNodes:
             if e.localName in field_list:
-                child_dict[e.localName] = e.childNodes[0].nodeValue
+                if e.childNodes:
+                    child_dict[e.localName] = e.childNodes[0].nodeValue
+                else:
+                    child_dict[e.localName] = ""
         return child_dict
 
     def extract_billing_data(self, node):
