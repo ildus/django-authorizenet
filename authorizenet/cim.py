@@ -139,10 +139,11 @@ def process_transaction(*args, **kwargs):
     """
     helper = CreateTransactionRequest(*args, **kwargs)
     response = helper.get_response()
-    if response.transaction_response.is_approved:
-        payment_was_successful.send(sender=response.transaction_response)
-    else:
-        payment_was_flagged.send(sender=response.transaction_response)
+    if response.transaction_response:
+        if response.transaction_response.is_approved:
+            payment_was_successful.send(sender=response.transaction_response)
+        else:
+            payment_was_flagged.send(sender=response.transaction_response)
     return response
 
 
